@@ -41,7 +41,7 @@ class BookshelfPage extends ConsumerWidget {
             gridDelegate:
                 const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
-              childAspectRatio: 0.65,
+              childAspectRatio: 0.6,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
             ),
@@ -92,7 +92,7 @@ class _BookCard extends ConsumerWidget {
             Expanded(
               flex: 1,
               child: Padding(
-                padding: const EdgeInsets.all(6),
+                padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
                 child: Text(
                   book.title,
                   maxLines: 2,

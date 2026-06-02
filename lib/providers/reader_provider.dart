@@ -149,7 +149,6 @@ class ReaderNotifier extends FamilyAsyncNotifier<ReaderState, int> {
         currentChapterIndex: chapterIndex,
         rawContent: content,
         contentPages: const [],
-        currentPageIndex: 0,
         isLoading: false,
       ));
     } catch (e) {
