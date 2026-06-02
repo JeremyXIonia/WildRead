@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:novel_reader/engine/content_fetcher.dart';
-import 'package:novel_reader/engine/rule_engine.dart';
-import 'package:novel_reader/models/book.dart';
-import 'package:novel_reader/models/chapter.dart';
-import 'package:novel_reader/providers/database_provider.dart';
+import 'package:wildread/engine/content_fetcher.dart';
+import 'package:wildread/engine/rule_engine.dart';
+import 'package:wildread/models/book.dart';
+import 'package:wildread/models/chapter.dart';
+import 'package:wildread/providers/database_provider.dart';
 
 final ruleEngineProvider = Provider<RuleEngine>((ref) => RuleEngine());
 

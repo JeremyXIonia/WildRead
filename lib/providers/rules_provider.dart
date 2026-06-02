@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:novel_reader/models/rule.dart';
-import 'package:novel_reader/providers/database_provider.dart';
+import 'package:wildread/models/rule.dart';
+import 'package:wildread/providers/database_provider.dart';
 
 final rulesProvider =
     AsyncNotifierProvider<RulesNotifier, List<Rule>>(RulesNotifier.new);

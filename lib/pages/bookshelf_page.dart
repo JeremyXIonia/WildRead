@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:novel_reader/providers/books_provider.dart';
+import 'package:wildread/providers/books_provider.dart';
 
 class BookshelfPage extends ConsumerWidget {
   const BookshelfPage({super.key});

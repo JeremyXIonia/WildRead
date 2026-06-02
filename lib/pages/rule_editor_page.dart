@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:novel_reader/engine/rule_engine.dart';
-import 'package:novel_reader/providers/rules_provider.dart';
+import 'package:wildread/engine/rule_engine.dart';
+import 'package:wildread/providers/rules_provider.dart';
 
 class RuleEditorPage extends ConsumerStatefulWidget {
   final String ruleId;

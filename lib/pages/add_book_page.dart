@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:novel_reader/engine/content_fetcher.dart';
-import 'package:novel_reader/providers/books_provider.dart';
-import 'package:novel_reader/providers/rules_provider.dart';
+import 'package:wildread/engine/content_fetcher.dart';
+import 'package:wildread/providers/books_provider.dart';
+import 'package:wildread/providers/rules_provider.dart';
 
 class AddBookPage extends ConsumerStatefulWidget {
   const AddBookPage({super.key});
@@ -17,6 +17,7 @@ class _AddBookPageState extends ConsumerState<AddBookPage> {
   String? _selectedRule;
   bool _isFetching = false;
   String? _error;
+  String? _debugInfo;
   BookInfo? _preview;
 
   @override
@@ -36,6 +37,7 @@ class _AddBookPageState extends ConsumerState<AddBookPage> {
       _isFetching = true;
       _error = null;
       _preview = null;
+      _debugInfo = null;
     });
 
     try {
@@ -44,10 +46,22 @@ class _AddBookPageState extends ConsumerState<AddBookPage> {
           rules.firstWhere((r) => r.name == _selectedRule).config;
       final rule = ref.read(ruleEngineProvider).parse(ruleJson);
       final fetcher = ref.read(contentFetcherProvider);
+
+      // Enable debug mode
+      fetcher.debugMode = true;
+      fetcher.debug = FetchDebug();
+
       final info = await fetcher.fetchBookInfo(url, rule);
-      setState(() => _preview = info);
+      setState(() {
+        _preview = info;
+        _debugInfo = fetcher.debug?.summarize();
+      });
     } catch (e) {
-      setState(() => _error = '抓取失败: $e');
+      final fetcher = ref.read(contentFetcherProvider);
+      setState(() {
+        _error = '抓取失败: $e';
+        _debugInfo = fetcher.debug?.summarize();
+      });
     } finally {
       setState(() => _isFetching = false);
     }
@@ -134,6 +148,10 @@ class _AddBookPageState extends ConsumerState<AddBookPage> {
             if (_isFetching)
               const Center(child: CircularProgressIndicator()),
 
+            // Debug panel
+            if (_debugInfo != null && _debugInfo!.isNotEmpty)
+              _DebugPanel(info: _debugInfo!),
+
             if (_preview != null) ...[
               const Divider(height: 32),
               Text('书名: ${_preview!.title}',
@@ -166,6 +184,38 @@ class _AddBookPageState extends ConsumerState<AddBookPage> {
             ],
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DebugPanel extends StatelessWidget {
+  final String info;
+  const _DebugPanel({required this.info});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(top: 12),
+      color: Colors.grey.shade900,
+      child: ExpansionTile(
+        title: const Text('🔍 调试信息',
+            style: TextStyle(color: Colors.greenAccent, fontSize: 14)),
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            child: SelectableText(
+              info,
+              style: const TextStyle(
+                color: Colors.white,
+                fontFamily: 'monospace',
+                fontSize: 11,
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

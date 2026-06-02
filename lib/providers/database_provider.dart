@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:novel_reader/database/database_helper.dart';
+import 'package:wildread/database/database_helper.dart';
 
 final databaseProvider = Provider<DatabaseHelper>((ref) {
   final db = DatabaseHelper();

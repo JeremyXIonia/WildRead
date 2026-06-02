@@ -10,7 +10,6 @@
     "description": "#intro"
   },
   "chapterList": {
-    "url": "#list a @href",
     "container": "#list",
     "item": "dd a",
     "title": "self::text",

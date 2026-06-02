@@ -1,4 +1,4 @@
-# Novel Reader
+# WildRead
 
 个人安卓小说阅读器，通过 JSON 规则动态适配不同网站，支持章节模式和翻页模式。
 

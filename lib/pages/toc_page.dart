@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:novel_reader/providers/reader_provider.dart';
+import 'package:wildread/providers/reader_provider.dart';
 
 class TocPage extends ConsumerWidget {
   final int bookId;

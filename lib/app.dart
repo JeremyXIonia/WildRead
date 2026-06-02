@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:novel_reader/pages/bookshelf_page.dart';
-import 'package:novel_reader/pages/add_book_page.dart';
-import 'package:novel_reader/pages/reader_page.dart';
-import 'package:novel_reader/pages/rules_page.dart';
-import 'package:novel_reader/pages/rule_editor_page.dart';
-import 'package:novel_reader/pages/toc_page.dart';
+import 'package:wildread/pages/bookshelf_page.dart';
+import 'package:wildread/pages/add_book_page.dart';
+import 'package:wildread/pages/reader_page.dart';
+import 'package:wildread/pages/rules_page.dart';
+import 'package:wildread/pages/rule_editor_page.dart';
+import 'package:wildread/pages/toc_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -49,14 +49,14 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
-class NovelReaderApp extends ConsumerWidget {
-  const NovelReaderApp({super.key});
+class WildReadApp extends ConsumerWidget {
+  const WildReadApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
-      title: 'Novel Reader',
+      title: 'WildRead',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.amber),
         useMaterial3: true,

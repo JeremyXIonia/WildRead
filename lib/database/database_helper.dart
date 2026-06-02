@@ -1,12 +1,12 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as p;
-import 'package:novel_reader/models/book.dart';
-import 'package:novel_reader/models/chapter.dart';
-import 'package:novel_reader/models/rule.dart';
-import 'package:novel_reader/models/reading_progress.dart';
+import 'package:wildread/models/book.dart';
+import 'package:wildread/models/chapter.dart';
+import 'package:wildread/models/rule.dart';
+import 'package:wildread/models/reading_progress.dart';
 
 class DatabaseHelper {
-  static const _dbName = 'novel_reader.db';
+  static const _dbName = 'wildread.db';
   static const _version = 1;
   Database? _db;
 
