@@ -291,6 +291,7 @@ class ReaderNotifier extends FamilyAsyncNotifier<ReaderState, int> {
 
   /// Split text into pages that each fit exactly within [pageHeight] at the
   /// given [fontSize] and [pageWidth], using TextPainter for accurate layout.
+  /// Layouts the full text once, then finds page boundaries via getPositionForOffset.
   List<String> _paginateContent(
     String rawText, {
     required double fontSize,
@@ -301,29 +302,33 @@ class ReaderNotifier extends FamilyAsyncNotifier<ReaderState, int> {
     if (processed.isEmpty) return [''];
 
     final style = TextStyle(fontSize: fontSize, height: 1.8);
+    final tp = TextPainter(
+      text: TextSpan(text: processed, style: style),
+      textDirection: TextDirection.ltr,
+    );
+    tp.layout(maxWidth: pageWidth);
+
+    if (tp.height <= pageHeight) return [processed];
+
     final pages = <String>[];
-    int start = 0;
+    double y = 0;
 
-    while (start < processed.length) {
-      final remaining = processed.substring(start);
-      final tp = TextPainter(
-        text: TextSpan(text: remaining, style: style),
-        textDirection: TextDirection.ltr,
-      );
-      tp.layout(maxWidth: pageWidth);
-
-      if (tp.height <= pageHeight || tp.height == 0) {
-        pages.add(remaining);
+    while (y < tp.height) {
+      final nextY = y + pageHeight;
+      if (nextY >= tp.height) {
+        final pos = tp.getPositionForOffset(Offset(0, y));
+        final chunk = processed.substring(pos.offset);
+        if (chunk.isNotEmpty) pages.add(chunk);
         break;
       }
-
-      final pos = tp.getPositionForOffset(Offset(0, pageHeight));
-      int cut = pos.offset;
-      if (cut <= 0) cut = 1;
-      pages.add(remaining.substring(0, cut));
-      start += cut;
+      final startPos = tp.getPositionForOffset(Offset(0, y));
+      final endPos = tp.getPositionForOffset(Offset(0, nextY));
+      if (endPos.offset > startPos.offset) {
+        pages.add(processed.substring(startPos.offset, endPos.offset));
+      }
+      y = nextY;
     }
 
-    return pages;
+    return pages.isEmpty ? [processed] : pages;
   }
 }
