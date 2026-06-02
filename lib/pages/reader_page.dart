@@ -20,11 +20,25 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
   bool _menuVisible = false;
   bool _contentLoaded = false;
 
+  late PageController _pageController;
+  int _controllerChapterIdx = -1;
+  int _lastPageCount = 0;
+
+  /// Page layout dimensions, computed from MediaQuery each build.
+  double _pageWidth = 0;
+  double _pageHeight = 0;
+
   @override
   void initState() {
     super.initState();
-    // Defer content load to after first frame, when provider is ready
+    _pageController = PageController();
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadIfReady());
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
   }
 
   void _loadIfReady() {
@@ -44,15 +58,38 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
     _loadIfReady();
   }
 
+  void _repaginateIfNeeded({bool force = false}) {
+    // Avoid duplicate pagination if pages already computed
+    if (!force) {
+      final s = ref.read(readerProvider(widget.bookId)).value;
+      if (s == null || s.rawContent.isEmpty || s.contentPages.isNotEmpty) {
+        return;
+      }
+    }
+    if (_pageWidth > 0 && _pageHeight > 0) {
+      ref.read(readerProvider(widget.bookId).notifier).repaginate(
+        fontSize: _fontSize,
+        pageWidth: _pageWidth,
+        pageHeight: _pageHeight,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final readerAsync = ref.watch(readerProvider(widget.bookId));
 
     final bgColor = _isDarkMode ? Colors.grey.shade900 : Colors.white;
-    final textColor =
-        _isDarkMode ? Colors.grey.shade200 : Colors.black87;
+    final textColor = _isDarkMode ? Colors.grey.shade200 : Colors.black87;
 
-    // Attempt to load content when data becomes available
+    // Compute page dimensions from screen metrics
+    final media = MediaQuery.of(context);
+    final safeTop = media.padding.top;
+    final safeBottom = media.padding.bottom;
+    const chromeHeight = 76.0; // title(~28) + bottom bar(~48)
+    _pageWidth = media.size.width - 40; // horizontal padding 20×2
+    _pageHeight = media.size.height - safeTop - safeBottom - chromeHeight;
+
     if (readerAsync.hasValue &&
         !_contentLoaded &&
         readerAsync.value!.chapters.isNotEmpty &&
@@ -70,90 +107,185 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
         ),
         child: readerAsync.when(
           data: (state) {
-            if (state.isLoading) {
-              return const Center(child: CircularProgressIndicator());
+            // Content loaded but not yet paginated → trigger pagination
+            if (state.rawContent.isNotEmpty &&
+                state.contentPages.isEmpty &&
+                !state.isLoading) {
+              WidgetsBinding.instance.addPostFrameCallback(
+                  (_) => _repaginateIfNeeded());
+            }
+
+            if (state.isLoading ||
+                (state.rawContent.isNotEmpty && state.contentPages.isEmpty)) {
+              return Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(),
+                    if (state.rawContent.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text('正在排版…',
+                          style: TextStyle(
+                              color: textColor.withAlpha(128),
+                              fontSize: 13)),
+                    ],
+                  ],
+                ),
+              );
             }
 
             final pages = state.contentPages;
             final hasContent =
                 pages.isNotEmpty && pages.any((p) => p.trim().isNotEmpty);
-            final currentContent =
-                hasContent ? pages[state.currentPageIndex] : '';
+
+            // Recreate PageController when chapter or page count changes
+            if (hasContent &&
+                (state.currentChapterIndex != _controllerChapterIdx ||
+                 pages.length != _lastPageCount)) {
+              _pageController.dispose();
+              _pageController = PageController(
+                  initialPage:
+                      state.currentPageIndex.clamp(0, pages.length - 1));
+              _controllerChapterIdx = state.currentChapterIndex;
+              _lastPageCount = pages.length;
+            }
 
             return Stack(
               children: [
-                // Content area (bottom layer)
                 Positioned.fill(
                   child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
                     onTap: () =>
                         setState(() => _menuVisible = !_menuVisible),
                     child: hasContent
                         ? SafeArea(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 20, vertical: 32),
-                              child: Column(
-                                children: [
-                                  if (state.chapters.isNotEmpty &&
-                                      state.currentChapterIndex <
-                                          state.chapters.length)
-                                    Text(
+                            child: Column(
+                              children: [
+                                // Chapter title
+                                if (state.chapters.isNotEmpty &&
+                                    state.currentChapterIndex <
+                                        state.chapters.length)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                        top: 4, bottom: 4),
+                                    child: Text(
                                       state
                                           .chapters[
                                               state.currentChapterIndex]
                                           .title,
                                       style: TextStyle(
                                         fontSize: 13,
-                                        color:
-                                            textColor.withAlpha(128),
+                                        color: textColor.withAlpha(128),
                                       ),
                                       textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                  const SizedBox(height: 16),
-                                  Expanded(
-                                    child: SingleChildScrollView(
-                                      key: ValueKey(
-                                          '${state.currentChapterIndex}-${state.currentPageIndex}'),
-                                      child: Text(
-                                        currentContent,
-                                        style: TextStyle(
-                                          fontSize: _fontSize,
-                                          height: 1.8,
-                                          color: textColor,
+                                  ),
+                                // Pages — horizontally swipeable, no vertical scroll
+                                Expanded(
+                                  child: PageView.builder(
+                                    key: ValueKey(
+                                        'pager-${state.currentChapterIndex}'),
+                                    controller: _pageController,
+                                    itemCount: pages.length,
+                                    onPageChanged: (index) {
+                                      ref
+                                          .read(readerProvider(
+                                                  widget.bookId)
+                                              .notifier)
+                                          .setPageIndex(index);
+                                    },
+                                    itemBuilder: (context, index) {
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 20),
+                                        child: Text(
+                                          pages[index],
+                                          style: TextStyle(
+                                            fontSize: _fontSize,
+                                            height: 1.8,
+                                            color: textColor,
+                                          ),
+                                          maxLines: null,
+                                          overflow: TextOverflow.clip,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                // Bottom bar
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                      bottom: 12, left: 20, right: 20),
+                                  child: Row(
+                                    children: [
+                                      if (state.currentPageIndex == 0 &&
+                                          state.currentChapterIndex > 0)
+                                        TextButton.icon(
+                                          onPressed: () {
+                                            ref
+                                                .read(readerProvider(
+                                                        widget.bookId)
+                                                    .notifier)
+                                                .prevChapter();
+                                          },
+                                          icon: const Icon(
+                                              Icons.arrow_back_ios,
+                                              size: 12),
+                                          label: const Text('上一章',
+                                              style:
+                                                  TextStyle(fontSize: 12)),
+                                          style: TextButton.styleFrom(
+                                            foregroundColor:
+                                                textColor.withAlpha(153),
+                                            padding: EdgeInsets.zero,
+                                            minimumSize: const Size(0, 32),
+                                          ),
+                                        )
+                                      else
+                                        const SizedBox(width: 60),
+                                      Expanded(
+                                        child: Text(
+                                          '${state.currentPageIndex + 1} / ${pages.length} 页',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color:
+                                                textColor.withAlpha(128),
+                                          ),
+                                          textAlign: TextAlign.center,
                                         ),
                                       ),
-                                    ),
-                                  ),
-                                  Padding(
-                                    padding:
-                                        const EdgeInsets.only(top: 16),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment
-                                              .spaceBetween,
-                                      children: [
-                                        Text(
-                                          '${state.currentPageIndex + 1} / ${pages.length}',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: textColor
-                                                .withAlpha(128),
+                                      if (state.currentPageIndex ==
+                                              pages.length - 1 &&
+                                          state.currentChapterIndex <
+                                              state.chapters.length - 1)
+                                        TextButton.icon(
+                                          onPressed: () {
+                                            ref
+                                                .read(readerProvider(
+                                                        widget.bookId)
+                                                    .notifier)
+                                                .nextChapter();
+                                          },
+                                          icon: const Icon(
+                                              Icons.arrow_forward_ios,
+                                              size: 12),
+                                          label: const Text('下一章',
+                                              style:
+                                                  TextStyle(fontSize: 12)),
+                                          style: TextButton.styleFrom(
+                                            foregroundColor:
+                                                textColor.withAlpha(153),
+                                            padding: EdgeInsets.zero,
+                                            minimumSize: const Size(0, 32),
                                           ),
-                                        ),
-                                        Text(
-                                          '${state.currentChapterIndex + 1} / ${state.chapters.length} 章',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: textColor
-                                                .withAlpha(128),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                        )
+                                      else
+                                        const SizedBox(width: 60),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           )
                         : Center(
@@ -166,11 +298,13 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
                                     const Icon(Icons.error_outline,
                                         size: 48, color: Colors.red),
                                     const SizedBox(height: 16),
-                                    SelectableText(state.error!,
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(
-                                            color: Colors.red,
-                                            fontSize: 13)),
+                                    SelectableText(
+                                      state.error!,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                          color: Colors.red,
+                                          fontSize: 13),
+                                    ),
                                     const SizedBox(height: 16),
                                     ElevatedButton(
                                       onPressed: _retry,
@@ -203,31 +337,7 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
                   ),
                 ),
 
-                // Left zone: prev page (ABOVE content, so it gets taps first)
-                Positioned(
-                  left: 0, top: 0, bottom: 0,
-                  width: MediaQuery.of(context).size.width / 3,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: () => ref
-                        .read(readerProvider(widget.bookId).notifier)
-                        .prevPage(),
-                  ),
-                ),
-
-                // Right zone: next page (ABOVE content)
-                Positioned(
-                  right: 0, top: 0, bottom: 0,
-                  width: MediaQuery.of(context).size.width / 3,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onTap: () => ref
-                        .read(readerProvider(widget.bookId).notifier)
-                        .nextPage(),
-                  ),
-                ),
-
-                // Menu overlay (top layer)
+                // Menu overlay
                 if (_menuVisible)
                   Positioned(
                     bottom: 0,
@@ -237,8 +347,11 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
                       fontSize: _fontSize,
                       brightness: _brightness,
                       isDarkMode: _isDarkMode,
-                      onFontSizeChanged: (v) =>
-                          setState(() => _fontSize = v),
+                      onFontSizeChanged: (v) {
+                        setState(() => _fontSize = v);
+                        WidgetsBinding.instance.addPostFrameCallback(
+                            (_) => _repaginateIfNeeded(force: true));
+                      },
                       onBrightnessChanged: (v) =>
                           setState(() => _brightness = v),
                       onToggleDarkMode: () =>

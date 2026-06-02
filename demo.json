@@ -2,7 +2,6 @@
   "name": "demo_rule",
   "baseUrl": "https://www.example.com",
   "encoding": "utf-8",
-  "mode": "chapter",
   "book": {
     "title": "#info h1",
     "author": "#info p:nth-child(2)",

@@ -50,7 +50,7 @@ class RuleConfig {
   final String name;
   final String? baseUrl;
   final String encoding;
-  final String mode;
+  final String? mode;
   final BookSelectors? book;
   final ChapterListSelectors? chapterList;
   final ContentSelectors content;
@@ -59,7 +59,7 @@ class RuleConfig {
     required this.name,
     this.baseUrl,
     this.encoding = 'utf-8',
-    required this.mode,
+    this.mode,
     this.book,
     this.chapterList,
     required this.content,
@@ -93,7 +93,7 @@ class RuleEngine {
 
   RuleConfig parse(String jsonString) {
     final map = json.decode(jsonString) as Map<String, dynamic>;
-    final mode = map['mode'] as String? ?? 'chapter';
+    final mode = map['mode'] as String?;
 
     BookSelectors? book;
     if (map['book'] != null) {
@@ -151,19 +151,8 @@ class RuleEngine {
       return 'JSON 格式错误: $e';
     }
 
-    if (!map.containsKey('mode') && !map.containsKey('name')) {
-      return '缺少必填字段: mode, name';
-    }
-    if (!map.containsKey('mode')) {
-      return '缺少必填字段: mode';
-    }
     if (!map.containsKey('name')) {
       return '缺少必填字段: name';
-    }
-
-    final mode = map['mode'] as String?;
-    if (mode != 'chapter' && mode != 'scroll') {
-      return 'mode 必须是 "chapter" 或 "scroll"';
     }
 
     if (!map.containsKey('content')) {
@@ -172,10 +161,6 @@ class RuleEngine {
     final content = map['content'] as Map<String, dynamic>?;
     if (content == null || !content.containsKey('body')) {
       return '缺少必填字段: content.body';
-    }
-
-    if (mode == 'chapter' && !map.containsKey('chapterList')) {
-      return '章节模式必须包含 chapterList';
     }
 
     return '';

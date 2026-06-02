@@ -55,13 +55,12 @@ lib/
 | `self::text` | 当前元素自身的文本（仅 chapterList.item 内使用） |
 | `self::@href` | 当前元素自身的属性（仅 chapterList.item 内使用） |
 
-### 章节模式完整示例
+### 完整示例（含章节列表 + 章节内翻页，两者可共存）
 
 ```json
 {
   "name": "规则名",
   "baseUrl": "https://www.example.com",
-  "mode": "chapter",
   "book": {
     "title": "#info h1",
     "author": "#info p:nth-child(2)",
@@ -89,9 +88,8 @@ lib/
 |------|------|------|
 | name | 是 | 规则唯一名称 |
 | baseUrl | 否 | 站点根 URL，用于补全相对路径 |
-| mode | 是 | `chapter`（章节模式）或 `scroll`（翻页模式） |
-| book.* | 否 | 书籍信息提取（scroll 模式可不填） |
-| chapterList | chapter 必填 | 章节目录提取 |
+| book.* | 否 | 书籍信息提取（不填则跳过） |
+| chapterList | 否 | 章节目录提取（不填则无法跳转章节） |
 | chapterList.url | 否 | 目录页 URL 选择器（目录在另一页面时用）；**注意：如果章节列表在图书详情同一页，不要填此字段，否则会导致错误的 URL 拼接** |
 | chapterList.container | 是 | 章节列表容器选择器 |
 | chapterList.item | 是 | 每个章节项的选择器 |
@@ -99,14 +97,16 @@ lib/
 | chapterList.href | 是 | 章节链接在 item 内的选择器 |
 | content | 是 | 正文提取规则 |
 | content.body | 是 | 正文容器选择器 |
-| content.nextPage | 否 | 章节内翻页的"下一页"链接选择器 |
+| content.nextPage | 否 | 章节内翻页的"下一页"链接选择器（填了则自动跟随翻页，最多 20 页） |
 | content.filters | 否 | 需要过滤的元素选择器列表 |
+
+> **`chapterList` 和 `content.nextPage` 是独立功能，可以只用其中一个，也可以两个同时用。** 有章节列表的站点通常每章还有多页（下一页链接），两者共存是常态。
 
 ## 核心行为
 
 - **编码**：用 `charset` 包自动检测（无需在规则里写 encoding）
 - **章节内分页**：抓取时自动跟随 `content.nextPage` 链接，拼接多页正文（最多 20 页）
-- **App 内分页**：按 1000 字/页切分，段落首行自动加两个全角空格缩进
+- **App 内分页**：用 TextPainter 按屏幕实际高度排版，每页恰好填满一屏，横向滑动翻页
 - **进度记录**：章节号 + 页内页码，退出重进恢复到离开位置
 - **TLS 兼容**：自动放宽证书校验，HTTPS 失败时回退 HTTP
 

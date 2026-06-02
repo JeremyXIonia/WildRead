@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wildread/engine/content_fetcher.dart';
 import 'package:wildread/models/book.dart';
@@ -10,6 +11,7 @@ class ReaderState {
   final Book? book;
   final List<Chapter> chapters;
   final int currentChapterIndex;
+  final String rawContent;
   final List<String> contentPages;
   final int currentPageIndex;
   final bool isLoading;
@@ -20,6 +22,7 @@ class ReaderState {
     this.book,
     this.chapters = const [],
     this.currentChapterIndex = 0,
+    this.rawContent = '',
     this.contentPages = const [],
     this.currentPageIndex = 0,
     this.isLoading = false,
@@ -31,6 +34,7 @@ class ReaderState {
     Book? book,
     List<Chapter>? chapters,
     int? currentChapterIndex,
+    String? rawContent,
     List<String>? contentPages,
     int? currentPageIndex,
     bool? isLoading,
@@ -41,6 +45,7 @@ class ReaderState {
         book: book ?? this.book,
         chapters: chapters ?? this.chapters,
         currentChapterIndex: currentChapterIndex ?? this.currentChapterIndex,
+        rawContent: rawContent ?? this.rawContent,
         contentPages: contentPages ?? this.contentPages,
         currentPageIndex: currentPageIndex ?? this.currentPageIndex,
         isLoading: isLoading ?? this.isLoading,
@@ -75,7 +80,6 @@ class ReaderNotifier extends FamilyAsyncNotifier<ReaderState, int> {
   }
 
   Future<void> loadChapterContent(int chapterIndex) async {
-    // Always reset to loading state, even if retrying after error
     final current = state.value;
     if (current == null) return;
 
@@ -100,7 +104,6 @@ class ReaderNotifier extends FamilyAsyncNotifier<ReaderState, int> {
       String content;
       String bodySelector = '?';
 
-      // Get rule to extract body selector for error messages
       final rules = await db.getRules();
       final matched = rules.where((r) => r.name == current.book!.ruleName);
       if (matched.isNotEmpty) {
@@ -142,19 +145,11 @@ class ReaderNotifier extends FamilyAsyncNotifier<ReaderState, int> {
             '选择器: $bodySelector');
       }
 
-      final pages = _splitIntoPages(content);
-
-      // Preserve saved page index when reloading same chapter,
-      // reset to 0 when navigating to a different chapter
-      final savedPage = (chapterIndex == current.currentChapterIndex)
-          ? current.currentPageIndex
-          : 0;
-      final pageIndex = savedPage < pages.length ? savedPage : 0;
-
       state = AsyncData(current.copyWith(
         currentChapterIndex: chapterIndex,
-        contentPages: pages,
-        currentPageIndex: pageIndex,
+        rawContent: content,
+        contentPages: const [],
+        currentPageIndex: 0,
         isLoading: false,
       ));
     } catch (e) {
@@ -163,6 +158,40 @@ class ReaderNotifier extends FamilyAsyncNotifier<ReaderState, int> {
         error: '${e is FormatException ? '编码错误' : '加载失败'}: $e',
       ));
     }
+  }
+
+  /// Paginate raw content into screen-sized pages.
+  /// Called by the UI after content is loaded or when font/size changes.
+  void repaginate({
+    required double fontSize,
+    required double pageWidth,
+    required double pageHeight,
+  }) {
+    final s = state.value;
+    if (s == null || s.rawContent.isEmpty || pageWidth <= 0 || pageHeight <= 0) return;
+
+    final pages = _paginateContent(
+      s.rawContent,
+      fontSize: fontSize,
+      pageWidth: pageWidth,
+      pageHeight: pageHeight,
+    );
+
+    final pageIndex = s.currentPageIndex < pages.length
+        ? s.currentPageIndex
+        : pages.length - 1;
+
+    state = AsyncData(s.copyWith(
+      contentPages: pages,
+      currentPageIndex: pageIndex.clamp(0, pages.length - 1),
+    ));
+  }
+
+  void setPageIndex(int index) {
+    final s = state.value;
+    if (s == null || index < 0 || index >= s.contentPages.length) return;
+    state = AsyncData(s.copyWith(currentPageIndex: index));
+    _saveProgress(s.currentChapterIndex);
   }
 
   void nextPage() {
@@ -196,6 +225,7 @@ class ReaderNotifier extends FamilyAsyncNotifier<ReaderState, int> {
       final next = s.currentChapterIndex + 1;
       state = AsyncData(s.copyWith(
         currentChapterIndex: next,
+        rawContent: '',
         contentPages: const [],
         currentPageIndex: 0,
       ));
@@ -211,6 +241,7 @@ class ReaderNotifier extends FamilyAsyncNotifier<ReaderState, int> {
       final prev = s.currentChapterIndex - 1;
       state = AsyncData(s.copyWith(
         currentChapterIndex: prev,
+        rawContent: '',
         contentPages: const [],
         currentPageIndex: 0,
       ));
@@ -224,6 +255,7 @@ class ReaderNotifier extends FamilyAsyncNotifier<ReaderState, int> {
     if (s == null) return;
     state = AsyncData(s.copyWith(
       currentChapterIndex: chapterIndex,
+      rawContent: '',
       contentPages: const [],
       currentPageIndex: 0,
     ));
@@ -242,14 +274,13 @@ class ReaderNotifier extends FamilyAsyncNotifier<ReaderState, int> {
     ));
   }
 
-  List<String> _splitIntoPages(String content, {int charsPerPage = 1000}) {
-    // Add Chinese-style first-line indent (two fullwidth spaces) per paragraph
+  /// Pre-process raw content: add Chinese-style paragraph indentation.
+  String _preprocessContent(String content) {
     const indent = '　　';
     final paragraphs = content.split(RegExp(r'\n\s*\n'));
-    final indented = paragraphs.map((p) {
+    return paragraphs.map((p) {
       final trimmed = p.trim();
       if (trimmed.isEmpty) return trimmed;
-      // Don't indent if already starts with indent or is a section header
       if (trimmed.startsWith(indent) ||
           trimmed.startsWith('第') ||
           trimmed.startsWith('卷')) {
@@ -257,26 +288,43 @@ class ReaderNotifier extends FamilyAsyncNotifier<ReaderState, int> {
       }
       return '$indent$trimmed';
     }).join('\n\n');
+  }
 
+  /// Split text into pages that each fit exactly within [pageHeight] at the
+  /// given [fontSize] and [pageWidth], using TextPainter for accurate layout.
+  List<String> _paginateContent(
+    String rawText, {
+    required double fontSize,
+    required double pageWidth,
+    required double pageHeight,
+  }) {
+    final processed = _preprocessContent(rawText);
+    if (processed.isEmpty) return [''];
+
+    final style = TextStyle(fontSize: fontSize, height: 1.8);
     final pages = <String>[];
-    final lines = indented.split('\n');
-    var currentPage = StringBuffer();
-    var charCount = 0;
+    int start = 0;
 
-    for (final line in lines) {
-      if (charCount + line.length > charsPerPage && charCount > 0) {
-        pages.add(currentPage.toString());
-        currentPage = StringBuffer();
-        charCount = 0;
+    while (start < processed.length) {
+      final remaining = processed.substring(start);
+      final tp = TextPainter(
+        text: TextSpan(text: remaining, style: style),
+        textDirection: TextDirection.ltr,
+      );
+      tp.layout(maxWidth: pageWidth);
+
+      if (tp.height <= pageHeight || tp.height == 0) {
+        pages.add(remaining);
+        break;
       }
-      currentPage.writeln(line);
-      charCount += line.length + 1;
+
+      final pos = tp.getPositionForOffset(Offset(0, pageHeight));
+      int cut = pos.offset;
+      if (cut <= 0) cut = 1;
+      pages.add(remaining.substring(0, cut));
+      start += cut;
     }
 
-    if (currentPage.isNotEmpty) {
-      pages.add(currentPage.toString());
-    }
-
-    return pages.isEmpty ? [content] : pages;
+    return pages;
   }
 }

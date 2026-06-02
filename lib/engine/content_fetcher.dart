@@ -108,7 +108,7 @@ class ContentFetcher {
       receiveTimeout: const Duration(seconds: 30),
       headers: {
         'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36',
         'Accept':
             'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
@@ -260,7 +260,7 @@ class ContentFetcher {
   /// Fetch book info: title, author, cover, description, and chapter list
   Future<BookInfo> fetchBookInfo(String url, RuleConfig rule) async {
     debug?.clear();
-    final html = await _fetchHtml(url, rule.encoding);
+    final html = await _fetchHtml(url, rule.encoding, referer: rule.baseUrl);
     if (debugMode) debug?.lastHtml = html;
     final doc = parseHtml(html);
     final baseUrl = rule.baseUrl ?? url;
@@ -288,7 +288,7 @@ class ContentFetcher {
       }
       try {
         if (listUrl != url) {
-          final listHtml = await _fetchHtml(listUrl, rule.encoding);
+          final listHtml = await _fetchHtml(listUrl, rule.encoding, referer: rule.baseUrl);
           final listDoc = parseHtml(listHtml);
           chapters = extractChapterList(listDoc, rule.chapterList!, listUrl);
         } else {
@@ -325,7 +325,7 @@ class ContentFetcher {
     const maxPages = 20; // safety limit
 
     while (pageCount < maxPages) {
-      final html = await _fetchHtml(currentUrl, rule.encoding);
+      final html = await _fetchHtml(currentUrl, rule.encoding, referer: rule.baseUrl);
       final doc = parseHtml(html);
       final body = extractBody(doc, rule.content);
 
@@ -360,18 +360,22 @@ class ContentFetcher {
   /// Fetch HTML with retry and encoding auto-detection.
   /// Checks response headers and HTML meta tags for charset.
   /// Tries HTTPS first, falls back to HTTP on TLS errors.
-  Future<String> _fetchHtml(String url, String encoding) async {
+  Future<String> _fetchHtml(String url, String encoding, {String? referer}) async {
     int retries = 0;
     const maxRetries = 3;
     String currentUrl = url;
 
     while (retries < maxRetries) {
       try {
+        final extraHeaders = <String, String>{};
+        if (referer != null) extraHeaders['Referer'] = referer;
+
         final response = await _dio.get(
           currentUrl,
           options: Options(
             responseType: ResponseType.bytes,
             receiveTimeout: const Duration(seconds: 15),
+            headers: extraHeaders.isNotEmpty ? extraHeaders : null,
           ),
         );
         final bytes = response.data as List<int>;
