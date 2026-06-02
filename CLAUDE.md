@@ -95,6 +95,7 @@ lib/
 | chapterList.item | 是 | 每个章节项的选择器 |
 | chapterList.title | 是 | 章节标题在 item 内的选择器 |
 | chapterList.href | 是 | 章节链接在 item 内的选择器 |
+| chapterList.order | 否 | 章节排列顺序，`"asc"`（正序，默认）或 `"desc"`（倒序）。部分站点目录从新到旧排列，设为 `"desc"` 即可翻转 |
 | content | 是 | 正文提取规则 |
 | content.body | 是 | 正文容器选择器 |
 | content.nextPage | 否 | 章节内翻页的"下一页"链接选择器（填了则自动跟随翻页，最多 20 页） |

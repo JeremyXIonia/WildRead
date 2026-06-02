@@ -294,6 +294,9 @@ class ContentFetcher {
         } else {
           chapters = extractChapterList(doc, rule.chapterList!, url);
         }
+        if (rule.chapterList!.order == 'desc') {
+          chapters = chapters.reversed.toList();
+        }
         if (chapters.isEmpty) {
           problems.add(
               '章节列表为空: container="${rule.chapterList!.container.selector}" item="${rule.chapterList!.item.selector}"');

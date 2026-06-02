@@ -84,6 +84,7 @@ Flutter + Riverpod + dio + html + sqflite
 | `chapterList.item` | 是 | 列表项选择器 |
 | `chapterList.title` | 是 | 章节标题在当前项内的选择器 |
 | `chapterList.href` | 是 | 章节链接在当前项内的选择器 |
+| `chapterList.order` | 否 | 章节排列顺序，`"asc"`（正序，默认）或 `"desc"`（倒序）。目录从新到旧的站点设 `"desc"` |
 | `content` | 是 | 正文提取 |
 | `content.title` | 否 | 章节标题选择器 |
 | `content.body` | 是 | 正文容器选择器 |

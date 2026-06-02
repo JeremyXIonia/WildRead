@@ -22,6 +22,7 @@ class ChapterListSelectors {
   final SelectorSpec item;
   final SelectorSpec title;
   final SelectorSpec href;
+  final String order; // "asc" or "desc"
 
   const ChapterListSelectors({
     this.url,
@@ -29,6 +30,7 @@ class ChapterListSelectors {
     required this.item,
     required this.title,
     required this.href,
+    this.order = 'asc',
   });
 }
 
@@ -109,12 +111,14 @@ class RuleEngine {
     ChapterListSelectors? chapterList;
     if (map['chapterList'] != null) {
       final cl = map['chapterList'] as Map<String, dynamic>;
+      final order = cl['order'] as String? ?? 'asc';
       chapterList = ChapterListSelectors(
         url: _parseOptionalSelector(cl['url']),
         container: _parseSelector(cl['container'] as String),
         item: _parseSelector(cl['item'] as String),
         title: _parseSelector(cl['title'] as String),
         href: _parseSelector(cl['href'] as String),
+        order: order == 'desc' ? 'desc' : 'asc',
       );
     }
 
