@@ -157,6 +157,26 @@ class DatabaseHelper {
     );
   }
 
+  Future<void> clearChapterCache(int chapterId) async {
+    final db = await database;
+    await db.update(
+      'chapters',
+      {'content': null, 'pages': null},
+      where: 'id = ?',
+      whereArgs: [chapterId],
+    );
+  }
+
+  Future<void> clearBookCache(int bookId) async {
+    final db = await database;
+    await db.update(
+      'chapters',
+      {'content': null, 'pages': null},
+      where: 'book_id = ?',
+      whereArgs: [bookId],
+    );
+  }
+
   // --- Progress ---
 
   Future<void> saveProgress(ReadingProgress progress) async {

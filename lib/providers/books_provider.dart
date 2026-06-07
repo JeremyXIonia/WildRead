@@ -53,6 +53,16 @@ class BooksNotifier extends AsyncNotifier<List<Book>> {
         ));
       }
       await db.insertChapters(chapters);
+    } else {
+      // Single-page content: create a synthetic chapter pointing to source URL
+      await db.insertChapters([
+        Chapter(
+          bookId: bookId,
+          title: info.title.isNotEmpty ? info.title : '正文',
+          url: url,
+          index: 0,
+        )
+      ]);
     }
 
     ref.invalidateSelf();

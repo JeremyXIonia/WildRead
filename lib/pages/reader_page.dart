@@ -46,10 +46,12 @@ class _ReaderPageState extends ConsumerState<ReaderPage> {
     final reader = ref.read(readerProvider(widget.bookId));
     if (reader.hasValue && reader.value!.chapters.isNotEmpty) {
       _contentLoaded = true;
-      final index = reader.value!.currentChapterIndex;
+      final s = reader.value!;
+      // Provider still has valid pages from previous visit — skip reload
+      if (s.rawContent.isNotEmpty && s.contentPages.isNotEmpty) return;
       ref
           .read(readerProvider(widget.bookId).notifier)
-          .loadChapterContent(index);
+          .loadChapterContent(s.currentChapterIndex);
     }
   }
 

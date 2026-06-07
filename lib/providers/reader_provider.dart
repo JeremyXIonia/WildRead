@@ -147,7 +147,20 @@ class ReaderNotifier extends FamilyAsyncNotifier<ReaderState, int> {
             '选择器: $bodySelector');
       }
 
+      // Update the chapter in the list to reflect cached content
+      final updatedChapters = current.chapters.toList();
+      updatedChapters[chapterIndex] = Chapter(
+        id: chapter.id,
+        bookId: chapter.bookId,
+        title: chapter.title,
+        url: chapter.url,
+        index: chapter.index,
+        content: content,
+        pages: chapter.pages,
+      );
+
       state = AsyncData(current.copyWith(
+        chapters: updatedChapters,
         currentChapterIndex: chapterIndex,
         rawContent: content,
         contentPages: const [],
@@ -317,6 +330,58 @@ class ReaderNotifier extends FamilyAsyncNotifier<ReaderState, int> {
     ));
     await loadChapterContent(chapterIndex);
     await _saveProgress(chapterIndex);
+  }
+
+  /// Clear cache for the given chapter and re-fetch if it's the current one.
+  Future<void> refreshChapter(int chapterIndex) async {
+    final s = state.value;
+    if (s == null) return;
+    final db = ref.read(databaseProvider);
+    final ch = s.chapters[chapterIndex];
+    if (ch.id == null) return;
+    await db.clearChapterCache(ch.id!);
+
+    // Update in-memory chapter to reflect cleared cache
+    final updated = s.chapters.toList();
+    updated[chapterIndex] = Chapter(
+      id: ch.id,
+      bookId: ch.bookId,
+      title: ch.title,
+      url: ch.url,
+      index: ch.index,
+    );
+    state = AsyncData(s.copyWith(chapters: updated));
+
+    if (chapterIndex == s.currentChapterIndex) {
+      await loadChapterContent(chapterIndex);
+    }
+  }
+
+  /// Clear cache for all chapters of the current book, then re-fetch current.
+  Future<void> refreshAllChapters() async {
+    final s = state.value;
+    if (s == null) return;
+    final db = ref.read(databaseProvider);
+    await db.clearBookCache(arg);
+
+    final updated = s.chapters
+        .map((ch) => Chapter(
+              id: ch.id,
+              bookId: ch.bookId,
+              title: ch.title,
+              url: ch.url,
+              index: ch.index,
+            ))
+        .toList();
+    state = AsyncData(s.copyWith(
+      chapters: updated,
+      rawContent: '',
+      contentPages: const [],
+    ));
+
+    if (updated.isNotEmpty) {
+      await loadChapterContent(s.currentChapterIndex);
+    }
   }
 
   Future<void> _saveProgress(int chapterIndex) async {
