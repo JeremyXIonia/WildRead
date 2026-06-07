@@ -95,6 +95,7 @@ lib/
 | chapterList.item | 是 | 每个章节项的选择器 |
 | chapterList.title | 是 | 章节标题在 item 内的选择器 |
 | chapterList.href | 是 | 章节链接在 item 内的选择器 |
+| chapterList.hrefPattern | 否 | 当链接为 `javascript:` 伪协议时，用此模板从 JS 参数重建真实 URL。`$1` `$2` 对应第 1、2 个参数，如 `"/book/$1/$2.html"` |
 | chapterList.order | 否 | 章节排列顺序，`"asc"`（正序，默认）或 `"desc"`（倒序）。部分站点目录从新到旧排列，设为 `"desc"` 即可翻转 |
 | content | 是 | 正文提取规则 |
 | content.body | 是 | 正文容器选择器 |

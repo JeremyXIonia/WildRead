@@ -23,6 +23,7 @@ class ChapterListSelectors {
   final SelectorSpec title;
   final SelectorSpec href;
   final String order; // "asc" or "desc"
+  final String? hrefPattern; // template for reconstructing URLs from javascript: links
 
   const ChapterListSelectors({
     this.url,
@@ -31,6 +32,7 @@ class ChapterListSelectors {
     required this.title,
     required this.href,
     this.order = 'asc',
+    this.hrefPattern,
   });
 }
 
@@ -112,6 +114,7 @@ class RuleEngine {
     if (map['chapterList'] != null) {
       final cl = map['chapterList'] as Map<String, dynamic>;
       final order = cl['order'] as String? ?? 'asc';
+      final hrefPattern = cl['hrefPattern'] as String?;
       chapterList = ChapterListSelectors(
         url: _parseOptionalSelector(cl['url']),
         container: _parseSelector(cl['container'] as String),
@@ -119,6 +122,7 @@ class RuleEngine {
         title: _parseSelector(cl['title'] as String),
         href: _parseSelector(cl['href'] as String),
         order: order == 'desc' ? 'desc' : 'asc',
+        hrefPattern: hrefPattern,
       );
     }
 

@@ -7,7 +7,7 @@ import 'package:wildread/models/reading_progress.dart';
 
 class DatabaseHelper {
   static const _dbName = 'wildread.db';
-  static const _version = 1;
+  static const _version = 2;
   Database? _db;
 
   Future<Database> get database async {
@@ -26,12 +26,14 @@ class DatabaseHelper {
         p.join(path, 'test_novel_reader.db'),
         version: _version,
         onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
       );
     }
     return openDatabase(
       p.join(await getDatabasesPath(), _dbName),
       version: _version,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -56,6 +58,7 @@ class DatabaseHelper {
         url TEXT NOT NULL,
         "index" INTEGER NOT NULL,
         content TEXT,
+        pages TEXT,
         UNIQUE(book_id, url)
       )
     ''');
@@ -77,6 +80,12 @@ class DatabaseHelper {
       )
     ''');
     await db.execute('PRAGMA foreign_keys = ON');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await db.execute('ALTER TABLE chapters ADD COLUMN pages TEXT');
+    }
   }
 
   // --- Books ---
@@ -133,6 +142,16 @@ class DatabaseHelper {
     await db.update(
       'chapters',
       {'content': content},
+      where: 'id = ?',
+      whereArgs: [chapterId],
+    );
+  }
+
+  Future<void> updateChapterPages(int chapterId, String pages) async {
+    final db = await database;
+    await db.update(
+      'chapters',
+      {'pages': pages},
       where: 'id = ?',
       whereArgs: [chapterId],
     );

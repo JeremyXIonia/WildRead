@@ -5,6 +5,7 @@ class Chapter {
   final String url;
   final int index;
   final String? content;
+  final String? pages;
 
   const Chapter({
     this.id,
@@ -13,6 +14,7 @@ class Chapter {
     required this.url,
     required this.index,
     this.content,
+    this.pages,
   });
 
   Map<String, dynamic> toMap() => {
@@ -22,6 +24,7 @@ class Chapter {
         'url': url,
         'index': index,
         'content': content,
+        'pages': pages,
       };
 
   factory Chapter.fromMap(Map<String, dynamic> map) => Chapter(
@@ -31,5 +34,6 @@ class Chapter {
         url: map['url'] as String,
         index: map['index'] as int,
         content: map['content'] as String?,
+        pages: map['pages'] as String?,
       );
 }

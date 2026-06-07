@@ -186,6 +186,11 @@ class ContentFetcher {
         href = el?.attributes[selectors.href.attr ?? 'href'] ?? '';
       }
 
+      // Reconstruct real URL from javascript: links using hrefPattern
+      if (href.startsWith('javascript:') && selectors.hrefPattern != null) {
+        href = _resolveJsHref(href, selectors.hrefPattern!);
+      }
+
       return ChapterInfo(
         title: title,
         url: resolveUrl(href, baseUrl),
@@ -480,6 +485,18 @@ class ContentFetcher {
     } catch (_) {
       return _DecodeResult(latin1.decode(bytes), 'latin1');
     }
+  }
+
+  /// Reconstruct a real URL from a javascript: link using a pattern.
+  /// e.g. "javascript:runbook('118388','7430439')" + "/book/$1/$2.html"
+  ///   → "/book/118388/7430439.html"
+  static String _resolveJsHref(String jsHref, String pattern) {
+    final params = RegExp(r"'([^']*)'").allMatches(jsHref).map((m) => m.group(1)!).toList();
+    var result = pattern;
+    for (var i = 0; i < params.length; i++) {
+      result = result.replaceAll('\$${i + 1}', params[i]);
+    }
+    return result;
   }
 
   /// Resolve a relative URL against a base URL

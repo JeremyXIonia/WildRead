@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wildread/engine/content_fetcher.dart';
@@ -169,6 +171,21 @@ class ReaderNotifier extends FamilyAsyncNotifier<ReaderState, int> {
     final s = state.value;
     if (s == null || s.rawContent.isEmpty || pageWidth <= 0 || pageHeight <= 0) return;
 
+    // Check cached page offsets first
+    final chapter = s.chapters[s.currentChapterIndex];
+    final cacheKey = _cacheKey(fontSize, pageWidth, pageHeight);
+    final cachedPages = _pagesFromCache(s.rawContent, chapter.pages, cacheKey);
+    if (cachedPages != null) {
+      final pageIndex = s.currentPageIndex < cachedPages.length
+          ? s.currentPageIndex
+          : cachedPages.length - 1;
+      state = AsyncData(s.copyWith(
+        contentPages: cachedPages,
+        currentPageIndex: pageIndex.clamp(0, cachedPages.length - 1),
+      ));
+      return;
+    }
+
     final pages = _paginateContent(
       s.rawContent,
       fontSize: fontSize,
@@ -184,7 +201,47 @@ class ReaderNotifier extends FamilyAsyncNotifier<ReaderState, int> {
       contentPages: pages,
       currentPageIndex: pageIndex.clamp(0, pages.length - 1),
     ));
+
+    // Persist page offsets to DB in background
+    _savePagesToDb(chapter.id, pages, cacheKey);
   }
+
+  /// Try to reconstruct pages from cached offsets. Returns null on cache miss.
+  List<String>? _pagesFromCache(String rawContent, String? cacheJson, String expectedKey) {
+    if (cacheJson == null) return null;
+    try {
+      final cached = json.decode(cacheJson) as Map<String, dynamic>;
+      if (cached['key'] != expectedKey) return null;
+      final offsets = (cached['offsets'] as List).cast<int>();
+      final processed = _preprocessContent(rawContent);
+      final pages = <String>[];
+      for (var i = 0; i < offsets.length; i++) {
+        final start = offsets[i];
+        final end = i + 1 < offsets.length ? offsets[i + 1] : processed.length;
+        pages.add(processed.substring(start, end));
+      }
+      return pages;
+    } catch (_) {
+      return null; // corrupt cache
+    }
+  }
+
+  /// Persist page boundary offsets to DB for future reads.
+  void _savePagesToDb(int? chapterId, List<String> pages, String cacheKey) {
+    if (chapterId == null) return;
+    final offsets = <int>[0];
+    var pos = 0;
+    for (var i = 0; i < pages.length - 1; i++) {
+      pos += pages[i].length;
+      offsets.add(pos);
+    }
+    final cacheJson = json.encode({'key': cacheKey, 'offsets': offsets});
+    ref.read(databaseProvider).updateChapterPages(chapterId, cacheJson);
+  }
+
+  /// Generate a cache key from pagination parameters.
+  String _cacheKey(double fontSize, double pageWidth, double pageHeight) =>
+      '${fontSize.toStringAsFixed(1)}|${pageWidth.toStringAsFixed(1)}|${pageHeight.toStringAsFixed(1)}';
 
   void setPageIndex(int index) {
     final s = state.value;
